@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/client" 
+  output   = "../src/generated/client"
 }
 
 datasource db {
@@ -24,24 +24,24 @@ enum OrderStatus {
 }
 
 model Order {
-  id             Int         @id @default(autoincrement())
-  orderId        String      @unique // Public ID shared with client
-  userId         String?     // Optional for now
-  
+  id      Int     @id @default(autoincrement())
+  orderId String  @unique // Public ID shared with client
+  userId  String? // Optional for now
+
   // Order Details
-  tokenIn        String
-  tokenOut       String
-  amountIn       Float
-  
+  tokenIn  String
+  tokenOut String
+  amountIn Float
+
   // Execution Details
   status         OrderStatus @default(PENDING)
-  selectedDex    String?     // 'Raydium' or 'Meteora'
+  selectedDex    String? // 'Raydium' or 'Meteora'
   executionPrice Float?
   txHash         String?
   failureReason  String?
-  
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("orders") // Map model to 'orders' table in DB
 }

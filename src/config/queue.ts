@@ -1,8 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import { redis } from './redis';
 
-// Reusing the connection from your existing redis.ts
-// BullMQ requires a specific connection structure
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT || '6379'),
