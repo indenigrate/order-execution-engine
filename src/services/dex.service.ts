@@ -74,7 +74,7 @@ export class DexService {
       this.getMeteoraQuote(tokenIn, tokenOut, amountIn)
     ]);
 
-    console.log(`📊 Comparison: Raydium ($${raydiumQuote.amountOut.toFixed(2)}) vs Meteora ($${meteoraQuote.amountOut.toFixed(2)})`);
+    console.log(`Comparison: Raydium ($${raydiumQuote.amountOut.toFixed(2)}) vs Meteora ($${meteoraQuote.amountOut.toFixed(2)})`);
 
     // Return the one with higher output amount
     return raydiumQuote.amountOut > meteoraQuote.amountOut ? raydiumQuote : meteoraQuote;
@@ -85,12 +85,13 @@ export class DexService {
    * "Simulate 2-3 second execution" [cite: 105]
    */
   async executeSwap(dex: DexName, tokenIn: string, tokenOut: string, amountIn: number): Promise<SwapResult> {
-    console.log(`🚀 Executing swap on ${dex}...`);
+    console.log(`Executing swap on ${dex}...`);
     
     // Simulate processing time (2000ms + random 1000ms) [cite: 106]
     const processingTime = 2000 + Math.random() * 1000;
     await this.delay(processingTime);
-
+    console.log(`⏳ Sleeping for 10s to allow WebSocket connection...`);
+    await this.delay(10000);
     // Simulate occasional failure (optional but good for testing retries)
     const isSuccess = Math.random() > 0.1; // 10% chance of failure
 

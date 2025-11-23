@@ -11,6 +11,9 @@ dotenv.config();
 const server = Fastify({ logger: true });
 
 server.register(websocket);
+// Register API Routes (prefix: /api/orders)
+
+server.register(orderRoutes, { prefix: '/api/orders' });
 
 server.get('/ping', async (request, reply) => {
   return { status: 'ok', message: 'Order Execution Engine is running' };
