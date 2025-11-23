@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma" 
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enum for strict status handling
+enum OrderStatus {
+  PENDING
+  ROUTING
+  BUILDING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+}
+
+model Order {
+  id             Int         @id @default(autoincrement())
+  orderId        String      @unique // Public ID shared with client
+  userId         String?     // Optional for now
+  
+  // Order Details
+  tokenIn        String
+  tokenOut       String
+  amountIn       Float
+  
+  // Execution Details
+  status         OrderStatus @default(PENDING)
+  selectedDex    String?     // 'Raydium' or 'Meteora'
+  executionPrice Float?
+  txHash         String?
+  failureReason  String?
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@map("orders") // Map model to 'orders' table in DB
+}
