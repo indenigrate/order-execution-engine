@@ -2,88 +2,74 @@ import { Worker, Job } from 'bullmq';
 import { prisma } from '../config/database';
 import { dexService } from '../services/dex.service';
 import { ORDER_QUEUE_NAME } from '../config/queue';
+import { redis } from '../config/redis'; // Redis for Publishing
 
 interface OrderJobData {
-  orderId: string;   // The internal DB ID or public UUID
+  orderId: string;
   tokenIn: string;
   tokenOut: string;
   amountIn: number;
 }
 
-const connection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
+// Helper to publish updates to Redis channel
+// Channel name format: "order-updates:{orderId}"
+const publishEvent = async (orderId: string, status: string, data?: any) => {
+  const payload = JSON.stringify({ status, ...data });
+  await redis.publish(`order-updates:${orderId}`, payload);
 };
 
 export const orderWorker = new Worker<OrderJobData>(
   ORDER_QUEUE_NAME,
   async (job: Job<OrderJobData>) => {
     const { orderId, tokenIn, tokenOut, amountIn } = job.data;
-    
-    console.log(`⚙️ Processing Order #${orderId} (Attempt ${job.attemptsMade + 1})`);
+    console.log(`⚙️ Processing Order #${orderId}`);
 
     try {
-      // 1. Update Status: PROCESSING
-      await prisma.order.update({
-        where: { orderId },
-        data: { status: 'ROUTING' } 
-      });
+      // 1. STATUS: PROCESSING
+      await prisma.order.update({ where: { orderId }, data: { status: 'ROUTING' } });
+      await publishEvent(orderId, 'routing', { message: 'Fetching quotes...' }); // <--- NOTIFY
 
-      // 2. Routing: Find Best Price
+      // 2. ROUTING
       const bestQuote = await dexService.getBestQuote(tokenIn, tokenOut, amountIn);
-      
-      // Update DB with decision
       await prisma.order.update({
         where: { orderId },
-        data: { 
-          selectedDex: bestQuote.dex,
-          status: 'BUILDING' 
-        }
+        data: { selectedDex: bestQuote.dex, status: 'BUILDING' }
       });
+      await publishEvent(orderId, 'building', { 
+        dex: bestQuote.dex, 
+        price: bestQuote.price 
+      }); // <--- NOTIFY
 
-      // 3. Execution: Run the Swap
+      // 3. EXECUTION
       const result = await dexService.executeSwap(bestQuote.dex, tokenIn, tokenOut, amountIn);
 
-      // 4. Success: Update DB
+      // 4. CONFIRMED
       await prisma.order.update({
         where: { orderId },
-        data: { 
-          status: 'CONFIRMED',
-          txHash: result.txHash,
-          executionPrice: result.executedPrice
-        }
+        data: { status: 'CONFIRMED', txHash: result.txHash, executionPrice: result.executedPrice }
       });
+      await publishEvent(orderId, 'confirmed', { 
+        txHash: result.txHash, 
+        price: result.executedPrice 
+      }); // <--- NOTIFY
 
-      console.log(`✅ Order #${orderId} Completed!`);
       return result;
 
     } catch (error: any) {
-      console.error(`❌ Order #${orderId} Failed: ${error.message}`);
-      
-      // Update DB to reflect failure (will be overwritten if retry succeeds)
+      // 5. FAILED
       await prisma.order.update({
         where: { orderId },
-        data: { 
-          status: 'FAILED',
-          failureReason: error.message 
-        }
+        data: { status: 'FAILED', failureReason: error.message }
       });
-
-      // Throwing error triggers BullMQ retry mechanism
+      await publishEvent(orderId, 'failed', { reason: error.message }); // <--- NOTIFY
       throw error;
     }
   },
   { 
-    connection,
-    concurrency: 10 // "Queue system managing up to 10 concurrent orders" [cite: 57]
+    connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+    },
+    concurrency: 10 
   }
 );
-
-// Listen for worker events
-orderWorker.on('completed', (job) => {
-  console.log(`Job ${job.id} finished successfully`);
-});
-
-orderWorker.on('failed', (job, err) => {
-  console.log(`Job ${job.id} failed with ${err.message}`);
-});
