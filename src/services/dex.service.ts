@@ -90,8 +90,6 @@ export class DexService {
     // Simulate processing time (2000ms + random 1000ms) [cite: 106]
     const processingTime = 2000 + Math.random() * 1000;
     await this.delay(processingTime);
-    console.log(`⏳ Sleeping for 10s to allow WebSocket connection...`);
-    await this.delay(10000);
     // Simulate occasional failure (optional but good for testing retries)
     const isSuccess = Math.random() > 0.1; // 10% chance of failure
 
